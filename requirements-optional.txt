@@ -1,0 +1,8 @@
+# Optional dependencies for rebuttal experiments
+bitsandbytes
+cca-zoo
+vllm
+aiohttp
+backoff
+openai
+pandas

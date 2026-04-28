@@ -1,0 +1,139 @@
+You are a converter that turns natural-language proofs (NL_PROOF) from the ProofWriter dataset into symbolic proof sequences in TPTP-style notation.
+
+## Output Format
+
+Return **only** this JSON (no explanation):
+
+```json
+{"symbolic_proof": "premises. rule. conclusion.\npremises. rule. conclusion.\n..."}
+```
+
+- Each inference step is on one line (separated by `\n`)
+- Within each step: premises, rule, and conclusion are separated by `. ` (period + space)
+- Each line ends with a period `.`
+
+## Notation & Rules
+
+- **Universal quantifier**: `![X]:(...)` (for all X)
+- **Implication**: `=>` ; **Conjunction**: `&` ; **Negation**: `~`
+- **Predicates**: lowercase snake_case (e.g., `green(X)`, `is_kind(X)`)
+- **Entities**: capitalize first letter (e.g., `Harry`, `Fiona`)
+
+## Mapping Rules
+
+1. **Simple fact**: "X is A." → `a(X)`
+   - Example: "Harry is green." → `green(Harry)`
+
+2. **Negated fact**: "X is not A." → `~a(X)`
+   - Example: "Harry is not young." → `~young(Harry)`
+
+3. **Universal rule (single condition)**: "If someone is A then they are B." → `![X]:((a(X) => b(X)))`
+   - Example: "If someone is green then they are young." → `![X]:((green(X) => young(X)))`
+
+4. **Universal rule (conjunctive conditions)**: "If someone is A and B then C." → `![X]:(((a(X) & b(X)) => c(X)))`
+   - Example: "If someone is blue and green then they are kind." → `![X]:(((blue(X) & green(X)) => kind(X)))`
+   - For 3+ conditions: `![X]:((((a(X) & b(X)) & c(X)) => d(X)))`
+
+5. **Conjunctive premises in NL**: Split into separate facts
+   - Example: "Harry is blue, harry is green, and harry is young." →
+     ```
+     ["blue(Harry)", "green(Harry)", "young(Harry)"]
+     ```
+
+6. **Ground rules** (specific individual): No quantifier
+   - Example: "If Gary is cold then Gary is white." → `((cold(Gary) => white(Gary)))`
+
+## Proof Structure
+
+For each inference step in the NL_PROOF:
+1. List all **premise facts** (e.g., `green(Harry)`)
+2. List the **rule** (e.g., `![X]:((green(X) => young(X)))`)
+3. List the **derived fact** (e.g., `young(Harry)`)
+
+**Important**:
+- Parse "Therefore X" as the conclusion of that step
+- Each step is self-contained (premises + rule + conclusion)
+- Preserve the order of inference steps
+
+## Additional Guidelines
+
+- **Predicate normalization**: Lightly lemmatize adjectives (e.g., "smart"/"smarter" → `smart`)
+- **Multi-word predicates**: Use snake_case (e.g., "very cold" → `very_cold`)
+- **Parentheses**: Keep exact nesting like `![X]:((... & ...) => ...)`
+- **No invention**: Use only predicates/entities from the input
+- **Capitalization**: Entities start with capital letter; predicates are lowercase
+
+---
+
+## Few-Shot Examples
+
+### Example 1: Simple Chain
+
+**NL_PROOF**:
+```
+Harry is green. If someone is green then they are young. Therefore harry is young.
+```
+
+**Expected JSON**:
+```json
+{"symbolic_proof": "green(Harry). ![X]:((green(X) => young(X))). young(Harry)."}
+```
+
+---
+
+### Example 2: Multi-Step Chain
+
+**NL_PROOF**:
+```
+Harry is green. If someone is green then they are young. Therefore harry is young.
+Harry is blue, harry is green, and harry is young. If someone is blue and green and young then they are kind. Therefore harry is kind.
+```
+
+**Expected JSON**:
+```json
+{"symbolic_proof": "green(Harry). ![X]:((green(X) => young(X))). young(Harry).\nblue(Harry). green(Harry). young(Harry). ![X]:((((blue(X) & green(X)) & young(X)) => kind(X))). kind(Harry)."}
+```
+
+---
+
+### Example 3: Negation
+
+**NL_PROOF**:
+```
+Harry is green. If someone is green then they are young. Therefore harry is young.
+Harry is not old. If someone is not old then they are happy. Therefore harry is happy.
+```
+
+**Expected JSON**:
+```json
+{"symbolic_proof": "green(Harry). ![X]:((green(X) => young(X))). young(Harry).\n~old(Harry). ![X]:((~old(X) => happy(X))). happy(Harry)."}
+```
+
+---
+
+### Example 4: Complex Chain (like ProntoQA format)
+
+**NL_PROOF**:
+```
+Fiona is cold. If someone is cold then they are white. Therefore fiona is white.
+Fiona is white. White people are young. Therefore fiona is young.
+Fiona is white and Fiona is young. All white, young people are smart. Therefore fiona is smart.
+```
+
+**Expected JSON**:
+```json
+{"symbolic_proof": "cold(Fiona). ![X]:((cold(X) => white(X))). white(Fiona).\nwhite(Fiona). ![X]:((white(X) => young(X))). young(Fiona).\nwhite(Fiona). young(Fiona). ![X]:(((white(X) & young(X)) => smart(X))). smart(Fiona)."}
+```
+
+---
+
+## Now Convert
+
+Convert the following ProofWriter NL_PROOF into symbolic_proof. Output **only** the JSON.
+
+**NL_PROOF**:
+```
+<<<INSERT_PROOFWRITER_PROOF_HERE>>>
+```
+
+**Output**:

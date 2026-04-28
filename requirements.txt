@@ -1,0 +1,9 @@
+torch>=2.0
+transformers>=4.40
+accelerate
+numpy
+scikit-learn
+scipy
+tqdm
+matplotlib
+transformer-lens>=2.0
